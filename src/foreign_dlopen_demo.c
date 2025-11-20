@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 
 	init_exec_elf(argv);
 
-	init_foreign_dlopen("fdlhelper");
+	init_foreign_dlopen(NULL);
 
 	z_printf("Come back: dlopen=%p\n", z_dlopen);
 	void *h = z_dlopen("libc.so.6", RTLD_NOW);

@@ -24,7 +24,7 @@ void init_foreign_dlopen(const char *file)
 {
 	char *argv[2];
 	z_sprintn(addrbuf, (unsigned long)do_jump, 16);
-	argv[0] = (char *)file;
+	argv[0] = "fdlhelper";
 	argv[1] = addrbuf;
 
 	if (!setjmp(jmpbuf)) {

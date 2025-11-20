@@ -1,0 +1,7 @@
+*.o
+fdlhelper.h
+compile_commands.json
+fdlhelper
+foreign_dlopen_demo
+loader
+.cache/

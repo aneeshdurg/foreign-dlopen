@@ -17,8 +17,10 @@ ifeq "$(STDLIB)" "0"
 #LDFLAGS += -nostartfiles -nodefaultlibs -nostdlib
 LDFLAGS += -nostartfiles -e z_start
 endif
-LDFLAGS += -pie -Wl,-Bsymbolic,--no-undefined,--build-id=none
+LDFLAGS += -pie -static -Wl,-Bsymbolic,--no-undefined,--build-id=none
 TARGET := loader foreign_dlopen_demo
+
+CC = /usr/local/musl/bin/musl-gcc
 
 ifeq "$(filter $(ARCH),$(ARCHS))" ""
   $(error ARCH='$(ARCH)' is not supported)
@@ -59,12 +61,15 @@ all: $(TARGET) fdlhelper
 
 loader: main.o $(OBJS)
 
-foreign_dlopen_demo: foreign_dlopen_demo.o $(OBJS)
+foreign_dlopen_demo: foreign_dlopen_demo.o $(OBJS) fdlhelper.h
 
 # fdlhelper lives in its own Makefile because compiler options are
 # completely different.
 fdlhelper:
 	$(MAKE) -f Makefile.fdlhelper
+
+fdlhelper.h: fdlhelper
+	xxd -i $^ > $@
 
 clean:
 	rm -rf *.o $(TARGET) fdlhelper */*.o
