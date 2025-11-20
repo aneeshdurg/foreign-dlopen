@@ -3,5 +3,6 @@ fdlhelper.h
 compile_commands.json
 fdlhelper
 foreign_dlopen_demo
+foreign_dlopen.a
 loader
 .cache/

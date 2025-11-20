@@ -59,10 +59,6 @@ endif
 
 all: $(TARGET) fdlhelper
 
-loader: main.o $(OBJS)
-
-foreign_dlopen_demo: foreign_dlopen_demo.o $(OBJS) fdlhelper.h
-
 # fdlhelper lives in its own Makefile because compiler options are
 # completely different.
 fdlhelper:
@@ -70,6 +66,13 @@ fdlhelper:
 
 fdlhelper.h: fdlhelper
 	xxd -i $^ > $@
+
+loader: main.o $(OBJS) fdlhelper.h
+
+foreign_dlopen.a: $(OBJS) fdlhelper.h
+	ar rcs $@ $^
+
+foreign_dlopen_demo: foreign_dlopen_demo.o $(OBJS) fdlhelper.h
 
 clean:
 	rm -rf *.o $(TARGET) fdlhelper */*.o
