@@ -11,7 +11,7 @@ ARCHS := $(ARCHS32) $(ARCHS64)
 
 CFLAGS_i386 = -m32
 
-CFLAGS += -pipe -Wall -Wextra -fPIC -fno-ident -fno-stack-protector -U _FORTIFY_SOURCE
+CFLAGS += -pipe -Wall -Wextra -fPIE -fno-ident -fno-stack-protector -U _FORTIFY_SOURCE
 CFLAGS += -DSTDLIB=$(STDLIB)
 ifeq "$(STDLIB)" "0"
 #LDFLAGS += -nostartfiles -nodefaultlibs -nostdlib

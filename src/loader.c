@@ -16,7 +16,7 @@
 #define LOAD_ERR ((unsigned long)-1)
 
 /* Original sp (i.e. pointer to executable params) passed to entry, if any. */
-unsigned long *entry_sp;
+unsigned long *entry_sp = NULL;
 
 /* External fini function that the caller can provide us. */
 static void (*x_fini)(void);
@@ -117,9 +117,12 @@ void z_entry(unsigned long *sp, void (*fini)(void)) {
 
 void init_exec_elf(char *argv[]) {
   /* We assume that argv comes from the original executable params. */
-  if (entry_sp == NULL) {
+  //if (entry_sp == NULL) {
     entry_sp = (unsigned long *)argv - 1;
-  }
+    z_printf("Set entry_sp to %p based on %p\n", argv, entry_sp);
+  //}
+  z_printf("After init_exec_elf entry_sp=%p &entry_sp=%p\n", entry_sp,
+           &entry_sp);
 }
 
 void exec_elf(const char *file, int argc, char *argv[]) {
@@ -133,13 +136,17 @@ void exec_elf(const char *file, int argc, char *argv[]) {
   int fd, i;
 
   {
+    z_printf("Setting up argc/argv\n");
     unsigned long *p = sp;
+    z_printf("sp = %p\n", sp);
     /* argc */
     p++;
     /* argv */
-    while (*p++ != 0)
-      ;
+    while (*p++ != 0) {
+      z_printf("found arg\n");
+    }
 
+    z_printf("Setting up auxv\n");
     unsigned long *from = p;
     /* env */
     while (*p++ != 0)
@@ -150,6 +157,7 @@ void exec_elf(const char *file, int argc, char *argv[]) {
     }
     p++;
 
+    z_printf("memcpying?\n");
     unsigned long argv_sz = argc * sizeof(*p);
     unsigned sz = (char *)p - (char *)from;
     p = alloca(sizeof(*p) + argv_sz + sz);
@@ -160,6 +168,7 @@ void exec_elf(const char *file, int argc, char *argv[]) {
     argv = (char **)sp + 1;
   }
 
+  z_printf("set envp?\n");
   env = p = (char **)&argv[argc + 1];
   while (*p++ != NULL)
     ;
@@ -167,6 +176,7 @@ void exec_elf(const char *file, int argc, char *argv[]) {
 
   (void)env;
 
+  z_printf("start actual load?\n");
   const void *mem = NULL;
   size_t offset = 0;
   size_t mem_len = 0;
