@@ -1,16 +1,15 @@
-#include "z_utils.h"
-#include "z_syscalls.h"
 #include "foreign_dlopen.h"
+#include "z_syscalls.h"
+#include "z_utils.h"
 
 #define RTLD_NOW 0x0002
 
-int main(int argc, char *argv[])
-{
-	(void)argc;
+int main(int argc, char *argv[], char *envp[]) {
+  (void)argc;
 
-	init_exec_elf(argv);
+  envp[0] = "LD_DEBUG=all";
 
-	init_foreign_dlopen(NULL);
+  init_exec_elf(argv);
 
 	z_printf("Come back: dlopen=%p\n", z_dlopen);
 	void *h = z_dlopen("libc.so.6", RTLD_NOW);

@@ -23,10 +23,11 @@ void do_jump(void **p)
 void init_foreign_dlopen(const char *file)
 {
   z_printf("idk?0\n");
-	char *argv[2];
+	char *argv[3];
 	z_sprintn(addrbuf, (unsigned long)do_jump, 16);
 	argv[0] = "fdlhelper";
 	argv[1] = addrbuf;
+	argv[2] = NULL;
   z_printf("idk?1\n");
 
 	if (!setjmp(jmpbuf)) {

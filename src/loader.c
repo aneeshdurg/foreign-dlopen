@@ -65,6 +65,8 @@ static unsigned long loadelf_anon(const void *mem, size_t *offset,
   flags = dyn ? 0 : MAP_FIXED;
   flags |= (MAP_PRIVATE | MAP_ANONYMOUS);
 
+  z_printf("hint = %p\n", hint);
+
   /* Check that we can hold the whole image. */
   base = z_mmap(hint, maxva - minva, PROT_NONE, flags, -1, 0);
   if (base == (void *)-1)
@@ -117,9 +119,9 @@ void z_entry(unsigned long *sp, void (*fini)(void)) {
 
 void init_exec_elf(char *argv[]) {
   /* We assume that argv comes from the original executable params. */
-  //if (entry_sp == NULL) {
-    entry_sp = (unsigned long *)argv - 1;
-    z_printf("Set entry_sp to %p based on %p\n", argv, entry_sp);
+  // if (entry_sp == NULL) {
+  entry_sp = (unsigned long *)argv - 1;
+  z_printf("Set entry_sp to %p based on %p\n", argv, entry_sp);
   //}
   z_printf("After init_exec_elf entry_sp=%p &entry_sp=%p\n", entry_sp,
            &entry_sp);
@@ -146,7 +148,8 @@ void exec_elf(const char *file, int argc, char *argv[]) {
       z_printf("found arg\n");
     }
 
-    z_printf("Setting up auxv\n");
+    z_printf("envp=%p envp[0]=%p\n", p, (void *)p[0]);
+    z_printf("measuring env+auxv\n");
     unsigned long *from = p;
     /* env */
     while (*p++ != 0)
@@ -158,7 +161,7 @@ void exec_elf(const char *file, int argc, char *argv[]) {
     p++;
 
     z_printf("memcpying?\n");
-    unsigned long argv_sz = argc * sizeof(*p);
+    unsigned long argv_sz = (argc + 1) * sizeof(*p);
     unsigned sz = (char *)p - (char *)from;
     p = alloca(sizeof(*p) + argv_sz + sz);
     *p = argc;
@@ -175,7 +178,8 @@ void exec_elf(const char *file, int argc, char *argv[]) {
   av = (void *)p;
 
   (void)env;
-
+  z_printf("envp = %p\n", env[0]);
+  z_printf("envp = %s\n", env[0]);
   z_printf("start actual load?\n");
   const void *mem = NULL;
   size_t offset = 0;
@@ -228,6 +232,7 @@ void exec_elf(const char *file, int argc, char *argv[]) {
     if ((base[i] = loadelf_anon(mem, &offset, ehdr, phdr)) == LOAD_ERR)
       z_errx(1, "can't load ELF %s", file);
 
+    z_printf("elfloaded %d at addr = %p\n", i, base[i]);
     /* Set the entry point, if the file is dynamic than add bias. */
     entry[i] = ehdr->e_entry + (ehdr->e_type == ET_DYN ? base[i] : 0);
     z_printf("entry[i] = %lx base[i] = %lx\n", entry[i], base[i]);
@@ -277,7 +282,8 @@ void exec_elf(const char *file, int argc, char *argv[]) {
 #undef AVSET
   ++av;
 
-  z_printf("trampo\n");
+  z_printf("trampo elf_iterp = %p, entry[Z_INTERP]=%p entry[Z_PROG]=%p \n",
+           elf_interp, entry[Z_INTERP], entry[Z_PROG]);
   z_trampo((void (*)(void))(elf_interp ? entry[Z_INTERP] : entry[Z_PROG]), sp,
            z_fini);
   /* Should not reach. */
