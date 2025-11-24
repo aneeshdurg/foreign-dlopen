@@ -10,29 +10,24 @@ void *(*z_dlsym)(void *handle, const char *symbol);
 int (*z_dlclose)(void *handle);
 char *(*z_dlerror)(void);
 
-void do_jump(void **p)
-{
-	z_printf("do_jump: %p\n", p);
-	z_dlopen = p[0];
-	z_dlsym = p[1];
-	z_dlclose = p[2];
-	z_dlerror = p[3];
-	longjmp(jmpbuf, 1);
+void do_jump(void **p) {
+  z_dlopen = p[0];
+  z_dlsym = p[1];
+  z_dlclose = p[2];
+  z_dlerror = p[3];
+  longjmp(jmpbuf, 1);
 }
 
-void init_foreign_dlopen(const char *file)
-{
-  z_printf("idk?0\n");
-	char *argv[3];
-	z_sprintn(addrbuf, (unsigned long)do_jump, 16);
-	argv[0] = "fdlhelper";
-	argv[1] = addrbuf;
-	argv[2] = NULL;
-  z_printf("idk?1\n");
+void init_foreign_dlopen(const char *file) {
+  char *argv[3];
+  z_sprintn(addrbuf, (unsigned long)do_jump, 16);
+  argv[0] = "fdlhelper";
+  argv[1] = addrbuf;
+  argv[2] = NULL;
 
-	if (!setjmp(jmpbuf)) {
-		exec_elf(file, 2, argv);
-	} else {
-		return;
-	}
+  if (!setjmp(jmpbuf)) {
+    exec_elf(file, 2, argv);
+  } else {
+    return;
+  }
 }

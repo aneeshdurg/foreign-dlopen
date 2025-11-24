@@ -65,8 +65,6 @@ static unsigned long loadelf_anon(const void *mem, size_t *offset,
   flags = dyn ? 0 : MAP_FIXED;
   flags |= (MAP_PRIVATE | MAP_ANONYMOUS);
 
-  z_printf("hint = %p\n", hint);
-
   /* Check that we can hold the whole image. */
   base = z_mmap(hint, maxva - minva, PROT_NONE, flags, -1, 0);
   if (base == (void *)-1)
@@ -121,10 +119,7 @@ void init_exec_elf(char *argv[]) {
   /* We assume that argv comes from the original executable params. */
   // if (entry_sp == NULL) {
   entry_sp = (unsigned long *)argv - 1;
-  z_printf("Set entry_sp to %p based on %p\n", argv, entry_sp);
   //}
-  z_printf("After init_exec_elf entry_sp=%p &entry_sp=%p\n", entry_sp,
-           &entry_sp);
 }
 
 void exec_elf(const char *file, int argc, char *argv[]) {
@@ -138,18 +133,13 @@ void exec_elf(const char *file, int argc, char *argv[]) {
   int fd, i;
 
   {
-    z_printf("Setting up argc/argv\n");
     unsigned long *p = sp;
-    z_printf("sp = %p\n", sp);
     /* argc */
     p++;
     /* argv */
-    while (*p++ != 0) {
-      z_printf("found arg\n");
-    }
+    while (*p++ != 0)
+      ;
 
-    z_printf("envp=%p envp[0]=%p\n", p, (void *)p[0]);
-    z_printf("measuring env+auxv\n");
     unsigned long *from = p;
     /* env */
     while (*p++ != 0)
@@ -160,7 +150,6 @@ void exec_elf(const char *file, int argc, char *argv[]) {
     }
     p++;
 
-    z_printf("memcpying?\n");
     unsigned long argv_sz = (argc + 1) * sizeof(*p);
     unsigned sz = (char *)p - (char *)from;
     p = alloca(sizeof(*p) + argv_sz + sz);
@@ -171,16 +160,12 @@ void exec_elf(const char *file, int argc, char *argv[]) {
     argv = (char **)sp + 1;
   }
 
-  z_printf("set envp?\n");
   env = p = (char **)&argv[argc + 1];
   while (*p++ != NULL)
     ;
   av = (void *)p;
 
   (void)env;
-  z_printf("envp = %p\n", env[0]);
-  z_printf("envp = %s\n", env[0]);
-  z_printf("start actual load?\n");
   const void *mem = NULL;
   size_t offset = 0;
   size_t mem_len = 0;
@@ -188,12 +173,10 @@ void exec_elf(const char *file, int argc, char *argv[]) {
   for (i = 0;; i++, ehdr++) {
     /* Open file, read and than check ELF header.*/
     if (!file) {
-      z_printf("use static fdlhelper\n");
       mem = (const void *)fdlhelper;
       offset = 0;
       mem_len = fdlhelper_len;
     } else {
-      z_printf("mmaping %s\n", file);
       if ((fd = z_open(file, O_RDONLY)) < 0)
         z_errx(1, "can't open %s", file);
       off_t sz = z_lseek(fd, 0, SEEK_END);
@@ -204,26 +187,17 @@ void exec_elf(const char *file, int argc, char *argv[]) {
         z_errx(1, "can't read file size %s", file);
       }
       mem_len = sz;
-      z_printf("Mapping %lu bytes\n", mem_len);
       mem = mmap(NULL, mem_len, PROT_READ, MAP_PRIVATE, fd, 0);
       if (mem == MAP_FAILED) {
         z_errx(1, "can't mmap file %s", file);
       }
       offset = 0;
-      z_printf("mem=%p, offset=%lu\n", mem, offset);
-      z_printf("mem[0] = %lx\n", *(unsigned long *)mem);
-      z_printf("&offset = %p, offset = %lx\n", &offset, offset);
     }
-    z_printf("&offset = %p, offset = %lx\n", &offset, offset);
-    z_printf("mem[0] = %lx\n", *(unsigned long *)mem);
-    z_printf("&offset = %p, offset = %lx\n", &offset, offset);
     memcpy(ehdr, mem + offset, sizeof(*ehdr));
     offset += sizeof(*ehdr);
-    z_printf("ehdr[0] = %lx\n", *(unsigned long *)ehdr);
     if (!check_ehdr(ehdr))
       z_errx(1, "bogus ELF header %s", file);
 
-    z_printf("ehdr->e_phnum = %d\n", ehdr->e_phnum);
     /* Read the program header. */
     sz = ehdr->e_phnum * sizeof(Elf_Phdr);
     phdr = z_alloca(sz);
@@ -232,18 +206,12 @@ void exec_elf(const char *file, int argc, char *argv[]) {
     if ((base[i] = loadelf_anon(mem, &offset, ehdr, phdr)) == LOAD_ERR)
       z_errx(1, "can't load ELF %s", file);
 
-    z_printf("elfloaded %d at addr = %p\n", i, base[i]);
     /* Set the entry point, if the file is dynamic than add bias. */
     entry[i] = ehdr->e_entry + (ehdr->e_type == ET_DYN ? base[i] : 0);
-    z_printf("entry[i] = %lx base[i] = %lx\n", entry[i], base[i]);
     /* The second round, we've loaded ELF interp. */
     if (file != NULL && file == elf_interp)
       break;
-    z_printf("iter = %lx ehdr->e_phnum = %d &phdr[ehdr->e_phnum]=%lx\n",
-             (unsigned long)phdr, ehdr->e_phnum,
-             (unsigned long)&phdr[ehdr->e_phnum]);
     for (iter = phdr; iter < &phdr[ehdr->e_phnum]; iter++) {
-      z_printf("iter->p_type = %d\n", iter->p_type);
       if (iter->p_type != PT_INTERP)
         continue;
       elf_interp = z_alloca(iter->p_filesz);
@@ -257,7 +225,6 @@ void exec_elf(const char *file, int argc, char *argv[]) {
     }
     /* Looks like the ELF is static -- leave the loop. */
     if (elf_interp == NULL) {
-      z_printf("elf_interp was null!\n");
       break;
     }
   }
@@ -282,8 +249,6 @@ void exec_elf(const char *file, int argc, char *argv[]) {
 #undef AVSET
   ++av;
 
-  z_printf("trampo elf_iterp = %p, entry[Z_INTERP]=%p entry[Z_PROG]=%p \n",
-           elf_interp, entry[Z_INTERP], entry[Z_PROG]);
   z_trampo((void (*)(void))(elf_interp ? entry[Z_INTERP] : entry[Z_PROG]), sp,
            z_fini);
   /* Should not reach. */
