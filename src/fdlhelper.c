@@ -1,9 +1,10 @@
+#define _GNU_SOURCE
 #include <unistd.h>
 #include <dlfcn.h>
 
 #define STR_AND_SIZE(s) s, sizeof(s) - 1
 
-void *funcs[4];
+void *funcs[6];
 
 static unsigned long hexstrtoul(const char *s)
 {
@@ -29,6 +30,8 @@ int main(int argc, char *argv[])
         funcs[1] = dlsym;
         funcs[2] = dlclose;
         funcs[3] = dlerror;
+        funcs[4] = dlmopen;
+        funcs[5] = dlinfo;
         /*printf("Calling to %p (%p %p)\n", p, funcs[0], funcs[1]);*/
         p(funcs);
     } else {

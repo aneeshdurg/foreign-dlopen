@@ -1,7 +1,7 @@
 # make ARCH=i386 SMALL=1 DEBUG=1
 
 ARCH ?= amd64
-STDLIB = 1
+STDLIB = 0
 SMALL = 0
 DEBUG = 0
 
@@ -18,6 +18,7 @@ ifeq "$(STDLIB)" "0"
 LDFLAGS += -nostartfiles -e z_start
 endif
 LDFLAGS += -pie -static -Wl,-Bsymbolic,--no-undefined,--build-id=none
+LDFLAGS += -l
 TARGET := loader foreign_dlopen_demo
 
 CC = /usr/local/musl/bin/musl-gcc

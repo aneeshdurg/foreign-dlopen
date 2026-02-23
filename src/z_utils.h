@@ -33,5 +33,7 @@ void	z_errx(int eval, const char *fmt, ...)
 #  define z_fdprintf(fd, fmt, ...) do {} while(0)
 #endif
 
+unsigned long z_saved_rax();
+
 #endif /* Z_UTILS_H */
 

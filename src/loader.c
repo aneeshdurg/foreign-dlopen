@@ -38,7 +38,8 @@ static int check_ehdr(Elf_Ehdr *ehdr) {
 }
 
 static unsigned long loadelf_anon(const void *mem, size_t *offset,
-                                  Elf_Ehdr *ehdr, Elf_Phdr *phdr) {
+                                  Elf_Ehdr *ehdr, Elf_Phdr *phdr,
+                                  exec_mem_cb_t exec_mem_cb) {
   unsigned long minva, maxva;
   Elf_Phdr *iter;
   ssize_t sz;
@@ -86,9 +87,12 @@ static unsigned long loadelf_anon(const void *mem, size_t *offset,
     if (p == (void *)-1)
       goto err;
     *offset = iter->p_offset;
-    memcpy(p + off, mem + *offset, iter->p_filesz);
+    z_memcpy(p + off, mem + *offset, iter->p_filesz);
     *offset += iter->p_filesz;
     z_mprotect(p, sz, PFLAGS(iter->p_flags));
+    if (exec_mem_cb && (iter->p_flags & PF_X)) {
+      exec_mem_cb(p, sz);
+    }
   }
 
   return (unsigned long)base;
@@ -100,10 +104,15 @@ err:
 #define Z_PROG 0
 #define Z_INTERP 1
 
+unsigned long z_saved_rax_value = 0;
+
 #if !STDLIB
 int main(int argc, char *argv[]);
 
+static pid_t z_getpid(void) { return (pid_t)z_syscall(39); }
+
 void z_entry(unsigned long *sp, void (*fini)(void)) {
+  __asm__("mov %%rax, %0" : "=m"(z_saved_rax_value));
   int argc;
   char **argv;
 
@@ -111,9 +120,13 @@ void z_entry(unsigned long *sp, void (*fini)(void)) {
   x_fini = fini;
   argc = (int)*(sp);
   argv = (char **)(sp + 1);
+
+  char **p = argv;
   main(argc, argv);
 }
 #endif
+
+unsigned long z_saved_rax() { return z_saved_rax_value; }
 
 void init_exec_elf(char *argv[]) {
   /* We assume that argv comes from the original executable params. */
@@ -122,7 +135,8 @@ void init_exec_elf(char *argv[]) {
   //}
 }
 
-void exec_elf(const char *file, int argc, char *argv[]) {
+void exec_elf(const char *file, int argc, char *argv[],
+              exec_mem_cb_t exec_mem_cb) {
   Elf_Ehdr ehdrs[2], *ehdr = ehdrs;
   Elf_Phdr *phdr, *iter;
   Elf_auxv_t *av;
@@ -187,7 +201,7 @@ void exec_elf(const char *file, int argc, char *argv[]) {
         z_errx(1, "can't read file size %s", file);
       }
       mem_len = sz;
-      mem = mmap(NULL, mem_len, PROT_READ, MAP_PRIVATE, fd, 0);
+      mem = z_mmap(NULL, mem_len, PROT_READ, MAP_PRIVATE, fd, 0);
       if (mem == MAP_FAILED) {
         z_errx(1, "can't mmap file %s", file);
       }
@@ -203,7 +217,8 @@ void exec_elf(const char *file, int argc, char *argv[]) {
     phdr = z_alloca(sz);
     memcpy(phdr, mem + ehdr->e_phoff, sz);
     /* Time to load ELF. */
-    if ((base[i] = loadelf_anon(mem, &offset, ehdr, phdr)) == LOAD_ERR)
+    if ((base[i] = loadelf_anon(mem, &offset, ehdr, phdr, exec_mem_cb)) ==
+        LOAD_ERR)
       z_errx(1, "can't load ELF %s", file);
 
     /* Set the entry point, if the file is dynamic than add bias. */
@@ -215,11 +230,11 @@ void exec_elf(const char *file, int argc, char *argv[]) {
       if (iter->p_type != PT_INTERP)
         continue;
       elf_interp = z_alloca(iter->p_filesz);
-      memcpy(elf_interp, mem + iter->p_offset, iter->p_filesz);
+      z_memcpy(elf_interp, mem + iter->p_offset, iter->p_filesz);
       if (elf_interp[iter->p_filesz - 1] != '\0')
         z_errx(1, "bogus interp path");
       if (file) {
-        munmap((void *)mem, mem_len);
+        z_munmap((void *)mem, mem_len);
       }
       file = elf_interp;
     }

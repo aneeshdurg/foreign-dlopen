@@ -22,5 +22,8 @@ int main(int argc, char *argv[], char *envp[]) {
 	void *h2 = z_dlopen("libz.so.1", RTLD_NOW);
 	z_printf("\nHandle of libz.so.1: %p\n", h2);
 
+	void *h3 = z_dlmopen(-1, "libc.so.6", RTLD_NOW);
+	z_printf("\nHandle of libc.so in new lm: %p\n", h3);
+
 	z_exit(0);
 }
