@@ -21,7 +21,9 @@ LDFLAGS += -pie -static -Wl,-Bsymbolic,--no-undefined,--build-id=none
 LDFLAGS += -l
 TARGET := loader foreign_dlopen_demo
 
-CC = /usr/local/musl/bin/musl-gcc
+# Any musl-gcc on PATH; override with MUSL_CC=/path/to/musl-gcc.
+MUSL_CC ?= musl-gcc
+CC = $(MUSL_CC)
 
 ifeq "$(filter $(ARCH),$(ARCHS))" ""
   $(error ARCH='$(ARCH)' is not supported)
