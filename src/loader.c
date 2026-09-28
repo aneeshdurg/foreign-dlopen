@@ -14,6 +14,8 @@
   ((((x) & PF_R) ? PROT_READ : 0) | (((x) & PF_W) ? PROT_WRITE : 0) |          \
    (((x) & PF_X) ? PROT_EXEC : 0))
 #define LOAD_ERR ((unsigned long)-1)
+/* Stack the interpreter bootstraps on; see exec_elf(). */
+#define BOOT_STACK_SIZE (256 * 1024)
 
 /* Original sp (i.e. pointer to executable params) passed to entry, if any. */
 unsigned long *entry_sp = NULL;
@@ -166,7 +168,19 @@ void exec_elf(const char *file, int argc, char *argv[],
 
     unsigned long argv_sz = (argc + 1) * sizeof(*p);
     unsigned sz = (char *)p - (char *)from;
-    p = alloca(sizeof(*p) + argv_sz + sz);
+    /* The interpreter keeps pointers into this block for good (_dl_argv,
+     * __environ, the auxv, __libc_stack_end) and later dlopen()s hand
+     * _dl_argv to each new libc's constructors. We longjmp() back out of the
+     * interpreter once it has run, so the block (and the stack it starts on
+     * below it) must outlive this frame - an alloca() here is reused by the
+     * caller and _dl_argv[0] ends up as garbage. Give it a dedicated,
+     * never-unmapped stack instead. */
+    unsigned long blk = (sizeof(*p) + argv_sz + sz + 15) & ~15UL;
+    char *stk = z_mmap(NULL, BOOT_STACK_SIZE, PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (stk == MAP_FAILED)
+      z_errx(1, "can't map interpreter stack");
+    p = (unsigned long *)(stk + BOOT_STACK_SIZE - blk);
     *p = argc;
     z_memcpy(p + 1, argv, argv_sz);
     z_memcpy((char *)(p + 1) + argv_sz, from, sz);
