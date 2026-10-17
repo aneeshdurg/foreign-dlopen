@@ -68,11 +68,13 @@ static unsigned long loadelf_anon(const void *mem, size_t *offset,
   flags = dyn ? 0 : MAP_FIXED;
   flags |= (MAP_PRIVATE | MAP_ANONYMOUS);
 
-  /* Check that we can hold the whole image. */
+  /* Reserve the whole image, and keep the reservation: the segments are
+   * mapped over it below. Unmapping it first would let another thread's
+   * mmap() - or the kernel's, for DIFUSE's context stacks - take part of the
+   * range in between, and MAP_FIXED would then replace that mapping. */
   base = z_mmap(hint, maxva - minva, PROT_NONE, flags, -1, 0);
   if (base == (void *)-1)
     return -1;
-  z_munmap(base, maxva - minva);
 
   flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
   /* Now map each segment separately in precalculated address. */
