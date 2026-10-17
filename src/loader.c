@@ -5,6 +5,7 @@
 #include "z_syscalls.h"
 #include "z_utils.h"
 #include <sys/mman.h>
+#include <syscall.h>
 
 #define PAGE_SIZE 4096
 #define ALIGN (PAGE_SIZE - 1)
@@ -27,6 +28,17 @@ static void z_fini(void) {
   z_printf("Fini at work: x_fini %p\n", x_fini);
   if (x_fini != NULL)
     x_fini();
+}
+
+/* See exec_elf_config(). */
+static int difuse_pkey = -1;
+
+/* mprotect(), also giving [p, p + len) the plugin's protection key if there
+ * is one: everything this loader maps belongs to the interpreter it starts. */
+static int protect(void *p, size_t len, int prot) {
+  if (difuse_pkey < 0)
+    return z_mprotect(p, len, prot);
+  return z_syscall(SYS_pkey_mprotect, p, len, prot, difuse_pkey) ? -1 : 0;
 }
 
 static int check_ehdr(Elf_Ehdr *ehdr) {
@@ -75,6 +87,9 @@ static unsigned long loadelf_anon(const void *mem, size_t *offset,
   base = z_mmap(hint, maxva - minva, PROT_NONE, flags, -1, 0);
   if (base == (void *)-1)
     return -1;
+  /* The gaps between segments stay the reservation's. */
+  if (protect(base, maxva - minva, PROT_NONE))
+    goto err;
 
   flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
   /* Now map each segment separately in precalculated address. */
@@ -93,7 +108,8 @@ static unsigned long loadelf_anon(const void *mem, size_t *offset,
     *offset = iter->p_offset;
     z_memcpy(p + off, mem + *offset, iter->p_filesz);
     *offset += iter->p_filesz;
-    z_mprotect(p, sz, PFLAGS(iter->p_flags));
+    if (protect(p, sz, PFLAGS(iter->p_flags)))
+      goto err;
     if (exec_mem_cb && (iter->p_flags & PF_X)) {
       exec_mem_cb(p, sz);
     }
@@ -142,9 +158,11 @@ void init_exec_elf(char *argv[]) {
 static const char *interp_override;
 static unsigned long difuse_syscall_stub;
 
-void exec_elf_config(const char *interp, unsigned long syscall_stub) {
+void exec_elf_config(const char *interp, unsigned long syscall_stub,
+                     int pkey) {
   interp_override = interp;
   difuse_syscall_stub = syscall_stub;
+  difuse_pkey = pkey;
 }
 
 void exec_elf(const char *file, int argc, char *argv[],
@@ -188,7 +206,8 @@ void exec_elf(const char *file, int argc, char *argv[],
     unsigned long blk = (sizeof(*p) + argv_sz + sz + 15) & ~15UL;
     char *stk = z_mmap(NULL, BOOT_STACK_SIZE, PROT_READ | PROT_WRITE,
                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (stk == MAP_FAILED)
+    if (stk == MAP_FAILED ||
+        protect(stk, BOOT_STACK_SIZE, PROT_READ | PROT_WRITE))
       z_errx(1, "can't map interpreter stack");
     p = (unsigned long *)(stk + BOOT_STACK_SIZE - blk);
     *p = argc;
@@ -226,7 +245,7 @@ void exec_elf(const char *file, int argc, char *argv[],
       }
       mem_len = sz;
       mem = z_mmap(NULL, mem_len, PROT_READ, MAP_PRIVATE, fd, 0);
-      if (mem == MAP_FAILED) {
+      if (mem == MAP_FAILED || protect((void *)mem, mem_len, PROT_READ)) {
         z_errx(1, "can't mmap file %s", file);
       }
       offset = 0;

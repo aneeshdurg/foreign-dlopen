@@ -11,8 +11,11 @@ void init_exec_elf(char *argv[]);
 /* For the next exec_elf(): load `interp` (if not NULL) instead of the
  * program's PT_INTERP, and, if `syscall_stub` isn't 0, hand it to the
  * interpreter as AT_DIFUSE_SYSCALL, in the auxv's first AT_IGNORE entry
- * (DIFUSE's kernel module reserves one). */
-void exec_elf_config(const char *interp, unsigned long syscall_stub);
+ * (DIFUSE's kernel module reserves one). If `pkey` isn't -1, every mapping
+ * the loader makes (the images, the interpreter's file and its stack) gets
+ * that protection key, which the calling thread must have access to. */
+void exec_elf_config(const char *interp, unsigned long syscall_stub,
+                     int pkey);
 void exec_elf(const char *file, int argc, char *argv[],
               exec_mem_cb_t exec_mem_cb);
 
