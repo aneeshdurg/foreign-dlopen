@@ -1,9 +1,20 @@
 #include "foreign_dlopen.h"
 #include "elf_loader.h"
 #include "z_utils.h"
-#include <setjmp.h>
 
+#if defined(__x86_64__)
+// amd64/z_jmp.S: unlike musl's, these unwind the shadow stack too - do_jump()
+// leaves the interpreter's frames behind.
+typedef unsigned long z_jmp_buf[9];
+__attribute__((returns_twice)) int z_setjmp(z_jmp_buf env);
+_Noreturn void z_longjmp(z_jmp_buf env, int val);
+#define setjmp z_setjmp
+#define longjmp z_longjmp
+z_jmp_buf jmpbuf;
+#else
+#include <setjmp.h>
 jmp_buf jmpbuf;
+#endif
 char addrbuf[17];
 void *(*z_dlopen)(const char *filename, int flags);
 void *(*z_dlmopen)(long int lmid, const char *filename, int flags);
