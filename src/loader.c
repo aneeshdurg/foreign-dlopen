@@ -137,6 +137,14 @@ void init_exec_elf(char *argv[]) {
   //}
 }
 
+static const char *interp_override;
+static unsigned long difuse_syscall_stub;
+
+void exec_elf_config(const char *interp, unsigned long syscall_stub) {
+  interp_override = interp;
+  difuse_syscall_stub = syscall_stub;
+}
+
 void exec_elf(const char *file, int argc, char *argv[],
               exec_mem_cb_t exec_mem_cb) {
   Elf_Ehdr ehdrs[2], *ehdr = ehdrs;
@@ -250,6 +258,8 @@ void exec_elf(const char *file, int argc, char *argv[],
       if (file) {
         z_munmap((void *)mem, mem_len);
       }
+      if (interp_override)
+        elf_interp = (char *)interp_override;
       file = elf_interp;
     }
     /* Looks like the ELF is static -- leave the loop. */
@@ -272,6 +282,13 @@ void exec_elf(const char *file, int argc, char *argv[],
       AVSET(AT_ENTRY, av, entry[Z_PROG]);
       AVSET(AT_EXECFN, av, (unsigned long)argv[1]);
       AVSET(AT_BASE, av, elf_interp ? base[Z_INTERP] : av->a_un.a_val);
+    case AT_IGNORE:
+      if (difuse_syscall_stub) {
+        av->a_type = AT_DIFUSE_SYSCALL;
+        av->a_un.a_val = difuse_syscall_stub;
+        difuse_syscall_stub = 0;
+      }
+      break;
     }
     ++av;
   }
