@@ -1,5 +1,6 @@
 *.o
 fdlhelper.h
+fdlhelper.asm
 compile_commands.json
 fdlhelper
 foreign_dlopen_demo
